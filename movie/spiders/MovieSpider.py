@@ -31,18 +31,41 @@ class moviespider(scrapy.Spider):
     def parseMovie(self, response):
         if response.status == 301:
             yield scrapy.Request(self.imdbhome, callback=self.parse)
-        title = response.xpath("//h1[@itemprop='name']/text()").extract()
-        vote = response.xpath("//span[@itemprop='ratingCount']/text()").extract()
+        title = response.xpath("//h1[@itemprop='name']/text()").extract_first()
+        vote = response.xpath("//span[@itemprop='ratingCount']/text()").extract()[-1]
         genre = response.xpath("//span[@itemprop='genre']/text()").extract()
-        #creators =response.xpath("//h4[@class='inline']span/a/span/[@itemprop='name']/text()").extract()
+        creators =response.xpath("//span[@itemprop='creator']//span[@itemprop='name']/text()").extract()
+        cast = response.xpath("//td[@itemprop='actor']//span[@itemprop='name']/text()").extract()
+        #first_two_cast = response.xpath("//td[@itemprop='actor']//span[@itemprop='name']/text()").extract()[:2]
+        time = response.xpath("//time[@datetime]/text()").extract()[-1]
+        plot_keywords = response.xpath("//div[@itemprop='keywords']//span[@itemprop='keywords']/text").extract()
+        country = response.xpath("//h4[@class='inline']//a[@itemprop='url']/text()").extract()
+        language = response.xpath("h4[contains(text(),'Language')]/..text()").extract()
+        filming_locations = response.xpath("h4[contains(text(),'Filming Locations')]/..text()").extract()
+        release_date = response.xpath("h4[contains(text(),'Release Date:')]/../text()").extract()
 
-        #first_two_cast = response.xpath("//span[@itemprop='name'][2]/text").extract()
-        #time = response.xpath("//time[@datetime]/text").extract()
-
-
-        yield dict(genre=genre,vote=vote, title=title)
+        yield {'genre': self.normalize_list(genre),
+               'vote': self.normalize_int(self.normalize_string(vote)),
+               'title': self.normalize_string(title),
+               'creators':self.normalize_list(creators),
+               'cast':self.normalize_list(cast),
+               'time': self.normalize_int(self.normalize_string(time)),
+               'country': self.normalize_string(country),
+               'plot_keywords': self.normalize_string(plot_keywords),
+               'language': self.normalize_string(language),
+               'filming_locations': self.normalize_list(filming_locations),
+               'release_date': self.normalize_string(release_date),
+               }
 
 
     def get_page_url(self, page):
-        return
-        """http://www.imdb.com/search/title?release_date=2010-01-01,2016-12-31&user_rating=8.0,10&page={}""".format(page)
+        return "http://www.imdb.com/search/title?release_date=2010-01-01,2016-12-31&user_rating=8.0,10&page=%d" % page
+
+    def normalize_string(self, s):
+        return str(filter(lambda x: ord(x) < 128, s)).rstrip()
+
+    def normalize_list(self, l):
+        return [self.normalize_string(x) for x in l]
+
+    def normalize_int(self, s):
+        return int(filter(lambda x: x.isdigit(), s))
